@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>PSU Schedule Generator</title>
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%234f46e5'/%3E%3Ctext x='50' y='57' font-size='50' text-anchor='middle' fill='%23fff' font-family='Segoe UI, Roboto, Arial'%3E🎓%3C/text%3E%3C/svg%3E" />
+
+  <style>
+    :root{
+      --bg-1: #f3f4f6;
+      --bg-2: #ffffff;
+      --accent-1: #4f46e5;
+      --accent-2: #06b6d4;
+      --muted: #6b7280;
+      --muted-dark: #93a1b2;
+      --card-radius: 12px;
+    }
+
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;}
+    body{background:linear-gradient(180deg,#eef2ff 0%,#eefdfd 100%);color:#0f172a;padding:24px;transition:background .25s,color .25s}
+    body.dark{background:linear-gradient(180deg,#071127 0%,#0b1223 100%);color:#e6eef8}
+
+    .app{max-width:1100px;margin:0 auto;display:grid;grid-template-rows:auto 1fr auto;gap:20px}
+
+    header.app-header{display:flex;align-items:center;justify-content:space-between;padding:14px;border-radius:var(--card-radius);background:linear-gradient(90deg,var(--bg-2),#f8fafc);box-shadow:0 6px 24px rgba(2,6,23,0.08);transition:background .25s}
+    body.dark header.app-header{background:rgba(255,255,255,0.02)}
+
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--accent-1),#7c3aed);display:flex;align-items:center;justify-content:center;color:white;font-size:20px}
+
+    .controls{display:flex;gap:8px;align-items:center}
+    .btn{background:var(--accent-1);color:white;border:none;padding:9px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;color:var(--accent-1);border:2px solid rgba(79,70,229,0.08)}
+    .btn.secondary{background:var(--accent-2)}
+
+    .main{display:grid;grid-template-columns:360px 1fr;gap:18px}
+    @media (max-width:980px){.main{grid-template-columns:1fr}}
+
+    .panel{background:var(--bg-2);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.05);transition:background .25s}
+    body.dark .panel{background:#0f172a}
+
+    .search-row{display:flex;gap:8px;align-items:center}
+    .search-input{flex:1;padding:10px;border-radius:10px;border:1px solid #e6edf3}
+
+    .course-list{margin-top:12px;max-height:420px;overflow:auto;border-radius:10px;border:1px solid #eef2ff}
+    .course-item{display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #f1f5f9;align-items:center}
+    .course-meta{font-size:12px;color:var(--muted)}
+
+    .selected-item{display:flex;justify-content:space-between;align-items:center;padding:10px;background:linear-gradient(180deg,#fbfdff,#ffffff);border-radius:8px;margin-bottom:8px;border:1px solid #eef2ff}
+
+    .card{background:var(--bg-2);padding:18px;border-radius:12px}
+    body.dark .card{background:#0f172a}
+
+    .schedule-grid{display:grid;grid-template-columns:90px repeat(5,1fr);gap:2px;background:#e6eef8;padding:6px;border-radius:8px}
+    body.dark .schedule-grid{background:rgba(255,255,255,0.02)}
+    .cell{background:white;padding:8px;min-height:42px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px}
+    body.dark .cell{background:#0b1223}
+    .cell.header{background:linear-gradient(90deg,var(--accent-1),#7c3aed);color:white;font-weight:700}
+    .class-slot{background:linear-gradient(90deg,#e9f2ff,#f0f8ff);border-left:4px solid var(--accent-1);padding:8px;border-radius:6px;cursor:pointer}
+    [dir="rtl"] .class-slot{border-left:0;border-right:4px solid var(--accent-1)}
+
+    .toast{position:fixed;right:20px;bottom:20px;background:#0ea5a4;color:white;padding:12px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.12);display:none}
+    .toast.show{display:block}
+
+    :focus{outline:2px dashed rgba(79,70,229,0.2);outline-offset:2px}
+
+    /* RTL helpers */
+    [dir="rtl"]{direction:rtl}
+    [dir="rtl"] header.app-header{flex-direction:row-reverse}
+    [dir="rtl"] .controls{flex-direction:row-reverse}
+    [dir="rtl"] .search-row{flex-direction:row-reverse}
+    [dir="rtl"] .course-item{flex-direction:row-reverse;text-align:right}
+    [dir="rtl"] .selected-item{flex-direction:row-reverse;text-align:right}
+    [dir="rtl"] .schedule-grid{direction:rtl}
+    [dir="rtl"] .toast{left:20px;right:auto}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header" role="banner">
+      <div class="brand">
+        <div class="logo" aria-hidden>🎓</div>
+        <div>
+          <h1 id="title">PSU Schedule Generator</h1>
+          <p id="subtitle">Create a realistic, conflict-free timetable — improved UI</p>
+        </div>
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="Main controls">
+        <button class="btn ghost" id="themeToggle" title="Toggle theme">Toggle theme</button>
+        <button class="btn" id="saveBtn">Save</button>
+        <button class="btn secondary" id="exportBtn">Export CSV</button>
+        <button class="btn ghost" id="clearBtn">Clear</button>
+        <button class="btn ghost" id="langToggle">العربية</button>
+      </div>
+    </header>
+
+    <main class="main" role="main">
+      <section class="panel" aria-labelledby="coursesHeading">
+        <h2 id="coursesHeading">📚 <span id="coursesLabel">Courses</span></h2>
+        <div class="search-row">
+          <input id="courseSearch" class="search-input" placeholder="Search code or name..." aria-label="Search courses" />
+          <button class="btn ghost" id="suggestBtn">Suggest</button>
+        </div>
+
+        <div class="course-list" id="courseList" tabindex="0" aria-live="polite"></div>
+
+        <div class="selected-list" aria-labelledby="selectedHeading">
+          <h3 id="selectedHeading">Selected</h3>
+          <div id="selectedCourses"></div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="generateBtn" class="btn" disabled>Generate</button>
+          <button id="saveLocalBtn" class="btn ghost">Save locally</button>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2 id="optionsHeading">Schedule Options</h2>
+          <div id="scheduleOptions" class="schedule-options"><p class="muted">Select courses and click Generate to see schedule options.</p></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h2 id="previewHeading">Preview</h2>
+          <div id="schedulePreview"><p class="muted">Choose an option to preview in the timetable below.</p></div>
+          <div style="margin-top:12px" id="previewControls"><button class="btn ghost" id="copySectionsBtn">Copy sections</button><button class="btn" id="printBtn">Print</button></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h2 id="tuitionHeading">Tuition Calculator</h2>
+          <div class="tuition-row"><label id="creditLabel">Cost / credit (SAR)</label><input id="creditCost" type="number" value="1200" style="width:120px;padding:8px;border-radius:6px;border:1px solid #eef2ff"/></div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><label id="scholarshipLabel">Scholarship</label>
+            <select id="scholarshipType"><option value="0">No</option><option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option></select>
+          </div>
+
+          <div id="tuitionSummary" style="margin-top:12px">
+            <div class="tuition-row"><span id="totalCreditsLabel">Total credits</span><span id="totalCredits">0</span></div>
+            <div class="tuition-row"><span id="baseLabel">Base</span><span id="baseTuition">SAR 0</span></div>
+            <div class="tuition-row"><span id="discountLabel">Discount</span><span id="scholarshipDiscount">SAR 0</span></div>
+            <div class="tuition-row" style="margin-top:8px;font-weight:700"><span id="finalLabel">Final</span><span id="finalTuition">SAR 0</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer role="contentinfo"><div id="footerLeft">Made for PSU • Improve, Save, Export</div><div style="font-size:12px;color:var(--muted)">Last saved: <span id="lastSaved">Never</span></div></footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script>
+    var courses = [
+      {code:'CS101',name:'Intro to Computer Science',credits:3,sections:[{section:'001',instructor:'Dr. A',days:['Sunday','Tuesday'],time:'08:00-09:30'},{section:'002',instructor:'Dr. B',days:['Monday','Wednesday'],time:'10:00-11:30'}]},
+      {code:'MATH201',name:'Calculus I',credits:4,sections:[{section:'001',instructor:'Dr. O',days:['Sunday','Tuesday','Thursday'],time:'09:00-10:00'},{section:'002',instructor:'Dr. F',days:['Monday','Wednesday'],time:'11:00-12:30'}]},
+      {code:'ENG102',name:'English Composition',credits:3,sections:[{section:'001',days:['Monday','Wednesday'],time:'08:00-09:30'},{section:'002',days:['Sunday','Tuesday'],time:'10:00-11:30'}]},
+      {code:'PHYS201',name:'Physics I',credits:4,sections:[{section:'001',days:['Sunday','Tuesday','Thursday'],time:'10:00-11:00'},{section:'002',days:['Monday','Wednesday'],time:'13:00-14:30'}]},
+      {code:'CS201',name:'Data Structures',credits:3,sections:[{section:'001',days:['Monday','Wednesday'],time:'09:00-10:30'},{section:'002',days:['Sunday','Tuesday'],time:'11:00-12:30'}]}
+    ];
+
+    var selectedCourses = [];
+    var generatedSchedules = [];
+    var currentSchedule = null;
+    var currentLang = localStorage.getItem('psu-lang') || 'en';
+
+    var courseListEl = document.getElementById('courseList');
+    var selectedCoursesEl = document.getElementById('selectedCourses');
+    var generateBtn = document.getElementById('generateBtn');
+    var scheduleOptionsEl = document.getElementById('scheduleOptions');
+    var schedulePreviewEl = document.getElementById('schedulePreview');
+    var toastEl = document.getElementById('toast');
+
+    var translations = {
+      en: {
+        courses:'Courses', selected:'Selected', generate:'Generate', saveLocal:'Save locally', suggest:'Suggest', preview:'Preview', scheduleOptions:'Schedule Options', copy:'Copy sections', print:'Print', tuition:'Tuition Calculator', creditLabel:'Cost / credit (SAR)', scholarshipLabel:'Scholarship', totalCredits:'Total credits', base:'Base', discount:'Discount', final:'Final', toggleTheme:'Toggle theme', save:'Save', export:'Export CSV', clear:'Clear', lang:'العربية', signIn:'Sign in', add:'Add', view:'View', alreadySelected:'Already selected', suggested:'Suggested courses added', generating:'Generating schedules...', noSchedules:'No schedules found', copied:'Copied', copiedAll:'All sections copied', savedLocal:'Saved locally', savedServer:'Saved to server (mock)', csvExported:'CSV exported', cleared:'Cleared', noExport:'No schedules to export', noSelection:'No schedule selected', confirmClear:'Clear selected courses and generated schedules?'
+      },
+      ar: {
+        courses:'المقررات', selected:'المختارة', generate:'إنشاء', saveLocal:'حفظ محليًا', suggest:'اقترح', preview:'المعاينة', scheduleOptions:'خيارات الجدول', copy:'نسخ الأقسام', print:'طباعة', tuition:'حاسبة الرسوم', creditLabel:'التكلفة / السهم (ريال)', scholarshipLabel:'المنحة', totalCredits:'إجمالي الساعات', base:'الأساسي', discount:'الخصم', final:'النهائي', toggleTheme:'تبديل المظهر', save:'حفظ', export:'تصدير CSV', clear:'مسح', lang:'English', signIn:'تسجيل الدخول', add:'إضافة', view:'عرض', alreadySelected:'تم الاختيار مسبقًا', suggested:'تمت إضافة المقررات المقترحة', generating:'يتم إنشاء الجداول...', noSchedules:'لم يتم العثور على جداول', copied:'تم النسخ', copiedAll:'تم نسخ جميع الأقسام', savedLocal:'حُفظ محليًا', savedServer:'حُفظ على الخادم (اختبار)', csvExported:'تم تصدير CSV', cleared:'تم المسح', noExport:'لا توجد جداول للتصدير', noSelection:'لم يتم تحديد جدول', confirmClear:'هل تريد مسح المقررات المحددة والجداول؟'
+      }
+    };
+
+    function t(key){
+      if (translations[currentLang] && translations[currentLang][key]) return translations[currentLang][key];
+      return key;
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      renderCourseList(courses);
+      setupListeners();
+      loadLastSave();
+      updateTuition();
+      applyLang();
+      initTheme();
+    });
+
+    function setupListeners(){
+      document.getElementById('courseSearch').addEventListener('input', function(e){
+        var q = e.target.value.trim().toLowerCase();
+        renderCourseList(courses.filter(function(c){ return c.code.toLowerCase().indexOf(q) !== -1 || c.name.toLowerCase().indexOf(q) !== -1; }));
+      });
+
+      document.getElementById('suggestBtn').addEventListener('click', function(){
+        var picks = courses.filter(function(c){ return !selectedCourses.find(function(s){ return s.code === c.code; }); }).slice(0,3);
+        picks.forEach(function(p){ selectCourse(p); });
+        showToast(t('suggested'));
+      });
+
+      document.getElementById('generateBtn').addEventListener('click', generateSchedules);
+      document.getElementById('clearBtn').addEventListener('click', clearAll);
+      document.getElementById('saveBtn').addEventListener('click', function(){ showToast(t('savedServer')); });
+      document.getElementById('saveLocalBtn').addEventListener('click', saveLocal);
+      document.getElementById('exportBtn').addEventListener('click', exportCSV);
+      document.getElementById('copySectionsBtn').addEventListener('click', copyCurrentSections);
+      document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+      var creditEl = document.getElementById('creditCost'); if (creditEl) creditEl.addEventListener('input', updateTuition);
+      var schol = document.getElementById('scholarshipType'); if (schol) schol.addEventListener('change', updateTuition);
+      document.getElementById('themeToggle').addEventListener('click', function(){ toggleTheme(); showToast(t('toggleTheme')); });
+      document.getElementById('langToggle').addEventListener('click', toggleLang);
+    }
+
+    function renderCourseList(list){
+      courseListEl.innerHTML = '';
+      list.forEach(function(course){
+        var row = document.createElement('div');
+        row.className = 'course-item';
+        row.tabIndex = 0;
+        var addLabel = t('add');
+        var viewLabel = t('view');
+        row.innerHTML = '<div><div style="font-weight:700">' + course.code + ' — ' + course.name + '</div><div class="course-meta">' + course.credits + ' credits • ' + course.sections.length + ' sections</div></div>' +
+                        '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">' +
+                        '<button class="btn ghost small" data-code="' + course.code + '">' + addLabel + '</button>' +
+                        '<button class="btn ghost small" data-code-view="' + course.code + '">' + viewLabel + '</button>' +
+                        '</div>';
+
+        row.querySelector('[data-code]').addEventListener('click', function(){ selectCourse(course); });
+        row.querySelector('[data-code-view]').addEventListener('click', function(){ viewCourse(course); });
+
+        courseListEl.appendChild(row);
+      });
+    }
+
+    function selectCourse(course){
+      if (selectedCourses.find(function(c){ return c.code === course.code; })) return showToast(t('alreadySelected'));
+      selectedCourses.push(course);
+      renderSelected();
+      updateGenerateState();
+      updateTuition();
+    }
+
+    function viewCourse(course){
+      var lines = course.sections.map(function(s){ return 'Sec ' + s.section + ': ' + s.days.join('/') + ', ' + s.time; }).join('');
+      alert(course.code + ' - ' + course.name + ' Credits :' + course.credits + ' Sections: ' + lines);
+    }
+
+    function renderSelected(){
+      selectedCoursesEl.innerHTML = '';
+      selectedCourses.forEach(function(c){
+        var el = document.createElement('div');
+        el.className = 'selected-item';
+        el.innerHTML = '<div style="text-align:inherit"><strong>' + c.code + '</strong> ' + c.name + ' <div style="font-size:12px;color:var(--muted)">' + c.credits + ' credits</div></div>' +
+                       '<div style="display:flex;gap:8px"><button class="btn ghost" data-rem="' + c.code + '">Remove</button></div>';
+        el.querySelector('[data-rem]').addEventListener('click', function(){ removeCourse(c.code); });
+        selectedCoursesEl.appendChild(el);
+      });
+    }
+
+    function removeCourse(code){ selectedCourses = selectedCourses.filter(function(x){ return x.code !== code; }); renderSelected(); updateGenerateState(); updateTuition(); }
+
+    function updateGenerateState(){ generateBtn.disabled = selectedCourses.length === 0; }
+
+    function generateAllCombinations(coursesArr){ if (coursesArr.length === 0) return [[]]; var first = coursesArr[0]; var rest = coursesArr.slice(1); var restComb = generateAllCombinations(rest); var out = []; first.sections.forEach(function(s){ restComb.forEach(function(rc){ var copy = [{courseCode:first.code,courseName:first.name,credits:first.credits,section:s.section,days:s.days,time:s.time}].concat(rc); out.push(copy); }); }); return out; }
+
+    function generateSchedules(){ showToast(t('generating')); var combos = generateAllCombinations(selectedCourses); var evaluated = combos.map(function(combo,idx){ var conflicts = checkConflicts(combo); var score = scoreSchedule(combo,conflicts); return {id:idx,sections:combo,conflicts:conflicts,score:score}; }); evaluated.sort(function(a,b){ return b.score - a.score; }); generatedSchedules = evaluated.slice(0,6); renderScheduleOptions(); }
+
+    function checkConflicts(secs){ var conflicts = []; for (var i = 0; i < secs.length; i++){ for (var j = i+1; j < secs.length; j++){ var a = secs[i]; var b = secs[j]; var shared = a.days.filter(function(d){ return b.days.indexOf(d) !== -1; }); if (shared.length){ var t1 = parseTimeRange(a.time); var t2 = parseTimeRange(b.time); if (t1.start < t2.end && t2.start < t1.end) conflicts.push({a:a.courseCode,b:b.courseCode,days:shared}); } } } return conflicts; }
+
+    function parseTimeRange(t){ var parts = t.split('-'); return {start: toMin(parts[0]), end: toMin(parts[1])}; }
+    function toMin(t){ var parts = t.split(':').map(function(n){ return parseInt(n,10); }); return parts[0]*60 + parts[1]; }
+    function scoreSchedule(secs,conflicts){ var score = 100; score -= conflicts.length * 40; var days = {}; secs.forEach(function(s){ s.days.forEach(function(d){ days[d] = true; }); }); var dayCount = Object.keys(days).length; if (dayCount <= 3) score += 10; if (score < 0) score = 0; if (score > 100) score = 100; return score; }
+
+    function renderScheduleOptions(){ scheduleOptionsEl.innerHTML = ''; if (!generatedSchedules.length){ scheduleOptionsEl.innerHTML = '<p class="muted">' + t('noSchedules') + '</p>'; return; } generatedSchedules.forEach(function(s,i){ var opt = document.createElement('div'); opt.className = 'schedule-option'; opt.tabIndex = 0; var conflictsText = s.conflicts.length === 0 ? t('noSchedules') : s.conflicts.length + ' conflict(s)'; opt.innerHTML = '<div style="font-weight:700">' + Math.round(s.score) + '% Compatible</div><div style="font-size:12px;color:var(--muted)">' + conflictsText + ' • ' + s.sections.length + ' courses</div>'; opt.addEventListener('click', function(){ selectSchedule(s.id); }); scheduleOptionsEl.appendChild(opt); }); }
+
+    function selectSchedule(id){ currentSchedule = generatedSchedules.find(function(g){ return g.id === id; }); Array.from(scheduleOptionsEl.children).forEach(function(el,idx){ el.classList.toggle('selected', generatedSchedules[idx].id === id); }); renderPreview(currentSchedule); }
+
+    function renderPreview(schedule){ if (!schedule){ schedulePreviewEl.innerHTML = '<p class="muted">' + t('noSelection') + '</p>'; return; } var times = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00']; var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday']; var html = '<div class="schedule-grid">'; html += '<div class="cell header">Time</div>'; days.forEach(function(d){ html += '<div class="cell header">' + d + '</div>'; }); times.forEach(function(tm){ html += '<div class="cell">' + tm + '</div>'; days.forEach(function(day){ var cls = schedule.sections.find(function(s){ return s.days.indexOf(day) !== -1 && toMin(tm) >= parseTimeRange(s.time).start && toMin(tm) < parseTimeRange(s.time).end; }); if (cls){ html += '<div class="cell"><div class="class-slot" data-code="' + cls.courseCode + '" data-sec="' + cls.section + '"><strong>' + cls.courseCode + '</strong><div style="font-size:12px;color:var(--muted)">Sec ' + cls.section + '</div></div></div>'; } else { html += '<div class="cell"></div>'; } }); }); html += '</div>'; html += '<div style="margin-top:10px;font-size:13px;color:var(--muted)">' + t('preview') + ': ' + schedule.sections.map(function(s){ return s.courseCode + '-' + s.section; }).join(', ') + '</div>'; schedulePreviewEl.innerHTML = html; Array.prototype.slice.call(document.querySelectorAll('.class-slot')).forEach(function(el){ el.addEventListener('click', function(){ copyToClipboard(el.dataset.code + '-' + el.dataset.sec); showToast(t('copied') + ' ' + el.dataset.code + '-' + el.dataset.sec); }); }); }
+
+    function copyToClipboard(text){ if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function(){}); }
+    function copyCurrentSections(){ if (!currentSchedule) return showToast(t('noSelection')); copyToClipboard(currentSchedule.sections.map(function(s){ return s.courseCode + '-' + s.section; }).join(', ')); showToast(t('copiedAll')); }
+
+    function saveLocal(){ var payload = {selected: selectedCourses, generated: generatedSchedules, last: new Date().toISOString()}; localStorage.setItem('psu-schedule', JSON.stringify(payload)); document.getElementById('lastSaved').textContent = new Date().toLocaleString(); showToast(t('savedLocal')); }
+    function loadLastSave(){ var raw = localStorage.getItem('psu-schedule'); if (!raw) return; try { var p = JSON.parse(raw); selectedCourses = p.selected || []; renderSelected(); updateGenerateState(); document.getElementById('lastSaved').textContent = p.last ? new Date(p.last).toLocaleString() : 'Unknown'; } catch(e){} }
+    function saveToServerMock(){ showToast(t('savedServer')); }
+
+    function exportCSV(){ if (!generatedSchedules.length) return showToast(t('noExport'));
+     var s = generatedSchedules[0]; 
+     var csvRows = [['Course','Section','Days','Time']];
+      s.sections.forEach(function(sec){ csvRows.push([sec.courseCode,sec.section,sec.days.join('/'),sec.time]); });
+       var csv = csvRows.map(function(r){ return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; })
+       .join(','); }).join(''); var blob = new Blob([csv], {type: 'text/csv'});
+ var url = URL.createObjectURL(blob);
+ var a = document.createElement('a');
+ a.href = url; a.download = 'schedule.csv';
+ document.body.appendChild(a); a.click();
+  a.remove(); 
+  URL.revokeObjectURL(url);
+   showToast(t('csvExported')); }
+
+    function clearAll(){ if (!confirm(t('confirmClear'))) return; selectedCourses = []; generatedSchedules = []; currentSchedule = null; renderSelected(); scheduleOptionsEl.innerHTML = ''; schedulePreviewEl.innerHTML = ''; updateGenerateState(); updateTuition(); showToast(t('cleared')); }
+
+    function updateTuition(){ var creditCostEl = document.getElementById('creditCost'); var creditCost = creditCostEl ? parseFloat(creditCostEl.value) || 0 : 0; var sch = parseFloat((document.getElementById('scholarshipType') && document.getElementById('scholarshipType').value) || 0); var totalCredits = selectedCourses.reduce(function(s,c){ return s + (c.credits || 0); }, 0); var base = totalCredits * creditCost; var disc = base * (sch / 100); var finalV = base - disc; document.getElementById('totalCredits').textContent = totalCredits; document.getElementById('baseTuition').textContent = 'SAR ' + base.toLocaleString(); document.getElementById('scholarshipDiscount').textContent = 'SAR ' + disc.toLocaleString(); document.getElementById('finalTuition').textContent = 'SAR ' + finalV.toLocaleString(); }
+
+    function showToast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(function(){ toastEl.classList.remove('show'); }, 2500); }
+
+    function initTheme(){ var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches; var saved = localStorage.getItem('psu-theme'); if (saved) document.body.classList.toggle('dark', saved === 'dark'); else document.body.classList.toggle('dark', prefersDark); }
+    function toggleTheme(){ var isDark = document.body.classList.toggle('dark'); localStorage.setItem('psu-theme', isDark ? 'dark' : 'light'); }
+
+    function applyLang(){ document.documentElement.setAttribute('lang', currentLang === 'ar' ? 'ar' : 'en'); document.documentElement.setAttribute('dir', currentLang === 'ar' ? 'rtl' : 'ltr');
+      document.getElementById('coursesHeading').textContent = '📚 ' + t('courses');
+      document.getElementById('selectedHeading').textContent = t('selected');
+      document.getElementById('generateBtn').textContent = t('generate');
+      document.getElementById('saveLocalBtn').textContent = t('saveLocal');
+      document.getElementById('suggestBtn').textContent = t('suggest');
+      document.getElementById('optionsHeading').textContent = t('scheduleOptions');
+      document.getElementById('previewHeading').textContent = t('preview');
+      document.getElementById('copySectionsBtn').textContent = t('copy');
+      document.getElementById('printBtn').textContent = t('print');
+      document.getElementById('tuitionHeading').textContent = t('tuition');
+      document.getElementById('creditLabel').textContent = t('creditLabel');
+      document.getElementById('scholarshipLabel').textContent = t('scholarshipLabel');
+      document.getElementById('totalCreditsLabel').textContent = t('totalCredits');
+      document.getElementById('baseLabel').textContent = t('base');
+      document.getElementById('discountLabel').textContent = t('discount');
+      document.getElementById('finalLabel').textContent = t('final');
+      document.getElementById('themeToggle').textContent = t('toggleTheme');
+      document.getElementById('saveBtn').textContent = t('save');
+      document.getElementById('exportBtn').textContent = t('export');
+      document.getElementById('clearBtn').textContent = t('clear');
+      document.getElementById('langToggle').textContent = t('lang');
+      document.getElementById('footerLeft').textContent = currentLang === 'ar' ? 'مصمم لجامعة PSU • تحسين • حفظ • تصدير' : 'Made for PSU • Improve, Save, Export';
+      var search = document.getElementById('courseSearch'); search.placeholder = currentLang === 'ar' ? 'ابحث بالرمز أو الاسم...' : 'Search code or name...'; search.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+      renderCourseList(courses);
+    }
+
+    function toggleLang(){ currentLang = currentLang === 'en' ? 'ar' : 'en'; localStorage.setItem('psu-lang', currentLang); applyLang(); }
+  </script>
+</body>
+</html>
